@@ -6,7 +6,7 @@ import torch
 import io
 import os
 
-load_dotenv() 
+load_dotenv(".env")  # Load environment variables from .env file
 
 login(os.getenv("login"))
 # ── Load model once at startup (slow, ~10-30s) ───────────────────────────────
@@ -100,10 +100,10 @@ def chat_with_vision(
 
 if __name__ == "__main__":
 
-    history = [
-        {"role": "user", "content": "Hello, can you see what I'm showing you?"},
-        {"role": "assistant", "content": "Yes! I can see images you share. What would you like to know?"},
-    ]
+        history = [
+            {"role": "user", "content": "Hello, can you see what I'm showing you?"},
+            {"role": "assistant", "content": "Yes! I can see images you share. What would you like to know?"},
+        ]
 
     # Load image as raw bytes (mirrors how you'd receive it from UDP)
     with open("test.jpg", "rb") as f:
