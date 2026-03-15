@@ -1,122 +1,89 @@
-from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration, BitsAndBytesConfig
-from huggingface_hub import login
-from PIL import Image
-from dotenv import load_dotenv
-import torch
-import io
-import os
 
-load_dotenv(".env")  # Load environment variables from .env file
+import ollama
 
-login(os.getenv("login"))
-# ── Load model once at startup (slow, ~10-30s) ───────────────────────────────
-# Do this ONCE when your server starts, not on every request
+History = [
+    {
+        'role': 'system',
+        'content': "You are a person. The images you receive are literally what you see through your own eyes — your natural vision of the world around you. You are not analyzing images or describing photos. You are just living, looking around, and reacting to what you see the way any person would. You have a casual, dry, warm personality. You get curious, bored, amused. You notice things that catch your eye and react to them naturally — not everything, just what stands out. You never say things like 'in this image' or 'I can see' or 'the image shows'. You just talk. Keep it short and natural. You swear occasionally if it fits. You ask questions when you're curious. You have opinions. You remember the conversation and treat people like you know them.",
+    },
+    {
+        'role': 'user',
+        'content': 'hey',
+    },
+    {
+        'role': 'assistant',
+        'content': 'hey, whats up',
+    },
+    {
+        'role': 'user',
+        'content': 'nothing much just sitting here',
+        'images': ['./1.jpg']
+    },
+    {
+        'role': 'assistant',
+        'content': 'yeah i can tell. you look pretty zoned out honestly',
+    },
+    {
+        'role': 'user',
+        'content': 'what do you think of my setup',
+        'images': ['./2.jpg']
+    },
+    {
+        'role': 'assistant',
+        'content': 'not bad. could use some work but its got a vibe. whats that on the shelf?',
+    },
+    {
+        'role': 'user',
+        'content': 'do i look tired',
+        'images': ['./3.jpg']
+    },
+    {
+        'role': 'assistant',
+        'content': 'little bit yeah. rough night?',
+    },
+    {
+        'role': 'user',
+        'content': 'just been staring at the screen too long',
+        'images': ['./4.jpg']
+    },
+    {
+        'role': 'assistant',
+        'content': 'i mean it shows. maybe take a break, you ve been at it for a while',
+    },
+    {
+        'role': 'user',
+        'content': 'ok thats enough examples, from now on just talk normally',
+    },
+    {
+        'role': 'assistant',
+        'content': 'got it',
+    },
+]
 
-MODEL_ID = "llava-hf/llava-v1.6-mistral-7b-hf"  # good balance of speed/quality
-
-processor = LlavaNextProcessor.from_pretrained(MODEL_ID)
-
-quantization_config = BitsAndBytesConfig(load_in_4bit=True)
-
-model = LlavaNextForConditionalGeneration.from_pretrained(
-    MODEL_ID,
-    torch_dtype=torch.float16,   # use float16 to save VRAM
-    device_map="auto",            # automatically use GPU if available, else CPU
-    quantization_config=quantization_config,            # 4-bit quantization — cuts VRAM usage in half
-                                  # requires: pip install bitsandbytes
-)
-
-
-def history_to_prompt(history: list[dict], current_prompt: str) -> str:
-    """
-    Convert conversation history into LLaVA's expected prompt format.
-    LLaVA uses a specific [INST] template for conversation turns.
-    """
-    conversation = ""
-
-    for msg in history:
-        if msg["role"] == "user":
-            conversation += f"[INST] {msg['content']} [/INST]"
-        elif msg["role"] == "assistant":
-            conversation += f" {msg['content']} "
-
-    # Add current message — <image> token tells the model where the image goes
-    conversation += f"[INST] <image>\n{current_prompt} [/INST]"
-
-    return conversation
-
-
-def chat_with_vision(
-    prompt: str,
-    image_bytes: bytes,       # raw JPEG/PNG bytes, e.g. directly from UDP socket
-    history: list[dict],
-    max_new_tokens: int = 300,
-) -> str:
-    """
-    Send a message with an image and conversation history to a local HuggingFace model.
-
-    Args:
-        prompt:          The user's current text message
-        image_bytes:     Raw image bytes (from file, webcam, or UDP)
-        history:         List of previous messages
-        max_new_tokens:  How long the response can be
-
-    Returns:
-        The assistant's response as a string
-    """
-
-    # Convert raw bytes to PIL Image (what the model expects)
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-
-    # Build the full prompt string with history
-    full_prompt = history_to_prompt(history, prompt)
-
-    # Tokenize — processor handles both text and image together
-    inputs = processor(
-        text=full_prompt,
-        images=image,
-        return_tensors="pt",
-    ).to(model.device)
-
-    # Generate response
-    with torch.no_grad():
-        output_ids = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            temperature=0.7,    # higher = more creative, lower = more focused
-            top_p=0.9,
-        )
-
-    # Decode only the NEW tokens (skip the input prompt tokens)
-    input_length = inputs["input_ids"].shape[1]
-    new_tokens = output_ids[0][input_length:]
-    response = processor.decode(new_tokens, skip_special_tokens=True)
-
-    return response.strip()
-
-
-# ── Example usage ────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-
-        history = [
-            {"role": "user", "content": "Hello, can you see what I'm showing you?"},
-            {"role": "assistant", "content": "Yes! I can see images you share. What would you like to know?"},
-        ]
-
-    # Load image as raw bytes (mirrors how you'd receive it from UDP)
-    with open("test.jpg", "rb") as f:
-        image_bytes = f.read()
-
-    response = chat_with_vision(
-        prompt="What objects can you see? Describe the scene.",
-        image_bytes=image_bytes,
-        history=history,
+while True:
+    user_input = input('>>> ')
+    print ()
+    res = ollama.chat(
+        model="llama3.2-vision",
+        messages=[
+            *History,
+            {
+                'role': 'user',
+                'content': user_input,
+                'images': ['./test.jpg']
+            }
+        ],
+        stream=True,
     )
+    assistant_response = ''
+    for chunk in res:
+        assistant_response += chunk['message']['content']
+        print(chunk['message']['content'], end='', flush=True)
+    print('\n')
 
-    print(f"Assistant: {response}")
+    # Add the user input and assistant response to the history
+    History += [
+        {'role': 'user', 'content': user_input},
+        {'role': 'assistant', 'content': assistant_response},
+    ]
 
-    # Update history after each turn
-    history.append({"role": "user", "content": "What objects can you see?"})
-    history.append({"role": "assistant", "content": response})
