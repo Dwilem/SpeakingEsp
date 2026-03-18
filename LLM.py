@@ -86,4 +86,6 @@ while True:
         {'role': 'user', 'content': user_input},
         {'role': 'assistant', 'content': assistant_response},
     ]
+    while len(History) > 20:
+        History.pop(0)
 
