@@ -17,7 +17,7 @@ History = [
     {
         'role': 'user',
         'content': 'nothing much just sitting here',
-        'images': ['./1.jpg']
+        'images': ['./Images/1.jpg']
     },
     {
         'role': 'assistant',
@@ -26,7 +26,7 @@ History = [
     {
         'role': 'user',
         'content': 'what do you think of my setup',
-        'images': ['./2.jpg']
+        'images': ['./Images/2.jpg']
     },
     {
         'role': 'assistant',
@@ -35,7 +35,7 @@ History = [
     {
         'role': 'user',
         'content': 'do i look tired',
-        'images': ['./3.jpg']
+        'images': ['./Images/3.jpg']
     },
     {
         'role': 'assistant',
@@ -44,7 +44,7 @@ History = [
     {
         'role': 'user',
         'content': 'just been staring at the screen too long',
-        'images': ['./4.jpg']
+        'images': ['./Images/4.jpg']
     },
     {
         'role': 'assistant',

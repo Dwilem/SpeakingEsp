@@ -3,18 +3,17 @@
 #include <WiFiUdp.h>
 #include "esp_camera.h"
 #include "driver/i2s.h"
+#include "secrets.h"
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const char* SSID        = "VR_House2";
-const char* PASS        = "YOUR_PASS";
 const char* SERVER_IP   = "192.168.0.101";   // your PC's IP
 const int   AUDIO_PORT  = 5005;
 const int   VIDEO_PORT  = 5006;
 
 // ── I2S mic pins (INMP441 / SPH0645) ─────────────────────────────────────────
-#define I2S_WS   15
-#define I2S_SD   13
-#define I2S_SCK  14
+#define I2S_WS   42
+#define I2S_SD   2
+#define I2S_SCK  41
 
 // ── Camera pin map (ESP32-S3 CAM Dev Board N16R8 — OV3660/OV2640) ──────────
 #define CAM_PIN_PWDN    -1
@@ -85,7 +84,7 @@ void initCamera() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   config.frame_size   = FRAMESIZE_QVGA;   // 320×240 — safe over UDP
-  config.jpeg_quality = 12;               // 0=best, 63=worst
+  config.jpeg_quality = 20;               // 0=best, 63=worst
   config.fb_count     = 2;
   config.fb_location  = CAMERA_FB_IN_PSRAM;
   config.grab_mode    = CAMERA_GRAB_WHEN_EMPTY;
@@ -112,6 +111,10 @@ void audioTask(void*) {
     audioUdp.beginPacket(SERVER_IP, AUDIO_PORT);
     audioUdp.write((uint8_t*)pcm, count * sizeof(int16_t));
     audioUdp.endPacket();
+        static int counter = 0;
+    if (++counter % 167 == 0)   // 167 × 30ms ≈ 5s
+      Serial.printf("[audio] stack free: %d bytes\n",
+                    uxTaskGetStackHighWaterMark(NULL));
   }
 }
 
@@ -144,6 +147,7 @@ void videoTask(void*) {
       videoUdp.beginPacket(SERVER_IP, VIDEO_PORT);
       videoUdp.write(buf, len + 6);
       videoUdp.endPacket();
+      vTaskDelay(2);
     }
 
     esp_camera_fb_return(fb);
@@ -157,6 +161,7 @@ void setup() {
   Serial.begin(115200);
   WiFi.begin(SSID, PASS);
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  WiFi.setSleep(false);
   Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
 
   initI2S();
@@ -166,8 +171,8 @@ void setup() {
   videoUdp.begin(VIDEO_PORT);
 
   // Audio on core 1, video on core 0 — keeps them from starving each other
-  xTaskCreatePinnedToCore(audioTask, "audio", 4096, NULL, 1, NULL, 1);
-  xTaskCreatePinnedToCore(videoTask, "video", 8192, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(audioTask, "audio", 8192, NULL, 1, NULL, 1);
+  //TaskCreatePinnedToCore(videoTask, "video", 8192, NULL, 1, NULL, 0);
 }
 
 void loop() { vTaskDelay(1000); }
